@@ -3,15 +3,15 @@ import { Text, View, SafeAreaView, ScrollView, Platform, PermissionsAndroid } fr
 import styles from './styles';
 import Error from '../../components/error';
 import Geolocation from '@react-native-community/geolocation';
+import { getCityName, getWeekends } from '../../services/api';
 
 class HomeScreen extends Component {
   constructor(props) {
     super(props);
     this.state = {
       isError: false,
-      currentLongitude: '',
-      currentLatitude: '',
-      locationStatus: ''
+      weatherData: null,
+      currentCity: '...Fetching'
     }
     this.watchID != null && Geolocation.clearWatch(this.watchID);
   }
@@ -20,7 +20,7 @@ class HomeScreen extends Component {
     const requestLocationPermission = async () => {
       if (Platform.OS === 'ios') {
         this.getOneTimeLocation();
-        //this.subscribeLocationLocation();
+        this.subscribeLocationLocation();
       } else {
         try {
           const granted = await PermissionsAndroid.request(
@@ -33,7 +33,7 @@ class HomeScreen extends Component {
           if (granted === PermissionsAndroid.RESULTS.GRANTED) {
             //To Check, If Permission is granted
             this.getOneTimeLocation();
-            //this.subscribeLocationLocation();
+            this.subscribeLocationLocation();
           } else {
             this.setState({ locationStatus: 'Permission Denied' })
           }
@@ -48,28 +48,28 @@ class HomeScreen extends Component {
     };
   };
 
-  getOneTimeLocation = () => {
-    this.setState({ locationStatus: 'Getting Location ...' })
+  getWeatherForecastCall(data) {
+    const { getSpinner, getRequestWeatherInfo } = this.props;
+    let body = `data/reverse-geocode-client?latitude=${data.lat}&longitude=${data.long}&localityLanguage=en`
+    
+    getSpinner();
+    getCityName(body).then((res) => {
+      this.setState({ currentCity: res.locality });
+    });
+    setTimeout(() => getRequestWeatherInfo(data), 3000);
+  }
 
+  getOneTimeLocation = () => {
     Geolocation.getCurrentPosition(
       //Will give you the current location
       (position) => {
-        this.setState({ locationStatus: 'You are Here ...' })
-        console.log('current position===', position);
         let data = {
           lat: JSON.stringify(position.coords.latitude),
           long: JSON.stringify(position.coords.longitude)
         }
-        this.props.getRequestWeatherInfo(data);
-        //getting the Longitude from the location json
-        this.setState({ currentLongitude: JSON.stringify(position.coords.longitude) });
-
-        //getting the Latitude from the location json
-        this.setState({ currentLatitude: JSON.stringify(position.coords.latitude) });
-
+        this.getWeatherForecastCall(data);
       },
       (error) => {
-        this.setState({ locationStatus: error.message })
       },
       {
         enableHighAccuracy: false,
@@ -83,23 +83,13 @@ class HomeScreen extends Component {
     this.watchID = Geolocation.watchPosition(
       (position) => {
         //Will give you the location on location change
-
-        this.setState({ locationStatus: 'You are Here ...' })
-        console.log('position change===', position);
         let data = {
           lat: JSON.stringify(position.coords.latitude),
           long: JSON.stringify(position.coords.longitude)
         }
-        this.props.getRequestWeatherInfo(data);
-        //getting the Longitude from the location json        
-        this.setState({ currentLongitude: JSON.stringify(position.coords.longitude) });
-
-        //getting the Latitude from the location json
-        this.setState({ currentLatitude: JSON.stringify(position.coords.latitude) });
-
+        this.getWeatherForecastCall(data);
       },
       (error) => {
-        this.setState({ locationStatus: error.message })
       },
       {
         enableHighAccuracy: false,
@@ -112,49 +102,58 @@ class HomeScreen extends Component {
     this.getCurrentLocation();
   }
 
+  static getDerivedStateFromProps(props, state) {
+    if (props.weatherInfo !== state.weatherData) {
+      console.log('weatherData=======', props.weatherInfo)
+      return {
+        weatherData: props.weatherInfo,
+      };
+    } else if (props.dataError) {
+      return {
+        isError: true
+      };
+    }
+    else {
+      return null;
+    }
+  }
+
   onRetry() {
-    setTimeout(() => {
-      this.setState({
-        isError: false,
-      });
-    }, 2000)
+    this.setState({
+      isError: false,
+    }, () => this.getCurrentLocation());
   }
 
   render() {
-    const { progress, isError } = this.state;
+    const { weatherData, isError, currentCity } = this.state;
+    const { isLoading } = this.props;
+
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.container}>
-          <View style={styles.topContent}>
-            <View style={styles.top}>
-              <Text style={styles.bigText}>10</Text>
-              <Text style={styles.smallText}>Delhi</Text>
+        { !isLoading && weatherData != null ?
+          <ScrollView style={styles.container}>
+            <View style={styles.topContent}>
+              <View style={styles.top}>
+                <Text style={styles.bigText}>{weatherData.current.temp}</Text>
+                <Text style={styles.smallText}>{currentCity}</Text>
+              </View>
             </View>
-          </View>
-          <View>
-            <View style={styles.row}>
-              <Text style={[styles.smallText, styles.margin]}>Monday</Text>
-              <Text style={[styles.weather, styles.margin]}>10</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.smallText, styles.margin]}>Tuesday</Text>
-              <Text style={[styles.weather, styles.margin]}>10</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.smallText, styles.margin]}>Wednesday</Text>
-              <Text style={[styles.weather, styles.margin]}>10</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.smallText, styles.margin]}>Thursday</Text>
-              <Text style={[styles.weather, styles.margin]}>10</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.smallText, styles.margin]}>Friday</Text>
-              <Text style={[styles.weather, styles.margin]}>10</Text>
-            </View>
-          </View>
-          {isError ? <Error retry={() => this.onRetry()} /> : null}
-        </ScrollView>
+            {
+              weatherData && weatherData.daily.length > 0 ?
+                weatherData.daily.map((value, key) => {
+                  return (
+                    <View key={key}>
+                      <View style={styles.row}>
+                        <Text style={[styles.smallText, styles.margin]}>{getWeekends(key)}</Text>
+                        <Text style={[styles.weather, styles.margin]}>{value.temp.max}</Text>
+                      </View>
+                    </View>)
+                }) : null
+            }
+
+          </ScrollView> : null
+        }
+        {isError ? <Error retry={() => this.onRetry()} /> : null}
       </SafeAreaView>
     );
   }
