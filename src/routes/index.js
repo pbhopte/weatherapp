@@ -2,7 +2,7 @@ import React from 'react';
 import { createAppContainer } from 'react-navigation';
 import { createStackNavigator } from 'react-navigation-stack';
 import SplashScreen from '../screens/splash';
-import HomeScreen from '../screens/home';
+import HomeScreen from '../screens/home/homeContainer';
 
 const StackNavigator = createStackNavigator(
   {

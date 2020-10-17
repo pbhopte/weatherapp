@@ -12,6 +12,8 @@ target 'weatherapp' do
 
   pod 'RNGestureHandler', :path => '../node_modules/react-native-gesture-handler'
 
+  pod 'react-native-geolocation', :path => '../node_modules/@react-native-community/geolocation'
+
   target 'weatherappTests' do
     inherit! :complete
     # Pods for testing
