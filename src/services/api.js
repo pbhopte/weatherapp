@@ -14,7 +14,7 @@ export async function CommonFetch(body) {
     })
     try {
         const getApiCall = await api.get(body)
-        return getApiCall.data;
+        return getApiCall;
     } catch (error) {
     }
 }
@@ -57,6 +57,6 @@ export function getWeekends(id) {
         case 7:
             return 'Monday';
         default:
-            return ;
+            return;
     }
 }

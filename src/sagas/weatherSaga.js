@@ -10,16 +10,14 @@ export function* weatherRequest(action) {
     let path = `/data/2.5/onecall?lat=${action.data.lat}&lon=${action.data.long}&exclude=hourly,minutely,alerts&appid=${APIKEY}&units=metric`
     try {
         const res = yield call(CommonFetch, path);
-        if (res) {
+        if (res.status === 201 || res.status === 204 || res.status === 200) {
             yield put(loaderActions.stopSpinner());
-            yield put(weatherActions.weatherSuccess(res));
+            yield put(weatherActions.weatherSuccess(res.data));
         } else {
-            console.log("==== weathe request error1 =====", res);
             yield put(loaderActions.stopSpinner());
             yield put(weatherActions.weatherFaliure(null));
         }
     } catch (error) {
-        console.log("==== weather request error2 =====", error);
         yield put(loaderActions.stopSpinner());
         yield put(weatherActions.weatherFaliure(null));
     }

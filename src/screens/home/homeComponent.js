@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Text, View, SafeAreaView, ScrollView, Platform, PermissionsAndroid } from 'react-native';
+import { Text, View, SafeAreaView, ScrollView, Platform, PermissionsAndroid, Alert } from 'react-native';
 import styles from './styles';
 import Error from '../../components/error';
 import Geolocation from '@react-native-community/geolocation';
@@ -11,6 +11,8 @@ class HomeScreen extends Component {
     this.state = {
       isError: false,
       weatherData: null,
+      latitude: '',
+      longitude: '',
       currentCity: '...Fetching'
     }
     this.watchID != null && Geolocation.clearWatch(this.watchID);
@@ -34,11 +36,14 @@ class HomeScreen extends Component {
             //To Check, If Permission is granted
             this.getOneTimeLocation();
             this.subscribeLocationLocation();
-          } else {
-            this.setState({ locationStatus: 'Permission Denied' })
-          }
+          } else if (granted === PermissionsAndroid.RESULTS.DENIED) {
+            Alert.alert(
+              `You can't deny the permission! Otherwise, you would not be able to use this application`,
+              [{ text: 'OK', onPress: () => this.getCurrentLocation() }]
+            );
+          } else { }
         } catch (err) {
-          console.warn(err);
+          console.log(err);
         }
       }
     };
@@ -51,10 +56,10 @@ class HomeScreen extends Component {
   getWeatherForecastCall(data) {
     const { getSpinner, getRequestWeatherInfo } = this.props;
     let body = `data/reverse-geocode-client?latitude=${data.lat}&longitude=${data.long}&localityLanguage=en`
-    
+
     getSpinner();
     getCityName(body).then((res) => {
-      this.setState({ currentCity: res.locality });
+      this.setState({ currentCity: res.locality, isError: false });
     });
     setTimeout(() => getRequestWeatherInfo(data), 3000);
   }
@@ -63,6 +68,10 @@ class HomeScreen extends Component {
     Geolocation.getCurrentPosition(
       //Will give you the current location
       (position) => {
+        this.setState({
+          latitude: JSON.stringify(position.coords.latitude),
+          longitude: JSON.stringify(position.coords.longitude)
+        });
         let data = {
           lat: JSON.stringify(position.coords.latitude),
           long: JSON.stringify(position.coords.longitude)
@@ -83,6 +92,10 @@ class HomeScreen extends Component {
     this.watchID = Geolocation.watchPosition(
       (position) => {
         //Will give you the location on location change
+        this.setState({
+          latitude: JSON.stringify(position.coords.latitude),
+          longitude: JSON.stringify(position.coords.longitude)
+        });
         let data = {
           lat: JSON.stringify(position.coords.latitude),
           long: JSON.stringify(position.coords.longitude)
@@ -104,24 +117,26 @@ class HomeScreen extends Component {
 
   static getDerivedStateFromProps(props, state) {
     if (props.weatherInfo !== state.weatherData) {
-      console.log('weatherData=======', props.weatherInfo)
       return {
         weatherData: props.weatherInfo,
       };
-    } else if (props.dataError) {
+    } 
+    if (props.dataError !== state.isError) {
       return {
         isError: true
       };
     }
-    else {
-      return null;
-    }
   }
 
   onRetry() {
+    const { latitude, longitude } = this.state;
+    let data = {
+      lat: latitude,
+      long: longitude
+    };
     this.setState({
       isError: false,
-    }, () => this.getCurrentLocation());
+    }, () => this.getWeatherForecastCall(data));
   }
 
   render() {
@@ -153,7 +168,7 @@ class HomeScreen extends Component {
 
           </ScrollView> : null
         }
-        {isError ? <Error retry={() => this.onRetry()} /> : null}
+        {!isLoading && isError && weatherData == null ? <Error retry={() => this.onRetry()} /> : null}
       </SafeAreaView>
     );
   }
